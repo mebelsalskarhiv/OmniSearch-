@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+      - elasticsearch
+      - redis
+    environment:
+      DATABASE_URL: postgresql://user:pass@postgres:5432/searchdb
+      ES_HOST: http://elasticsearch:9200
+      REDIS_URL: redis://redis:6379
+    volumes:
+      - ./app:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  worker:
+    build: .
+    depends_on:
+      - redis
+      - postgres
+    environment:
+      DATABASE_URL: postgresql://user:pass@postgres:5432/searchdb
+      ES_HOST: http://elasticsearch:9200
+      REDIS_URL: redis://redis:6379
+    command: celery -A app.tasks.celery_app worker -l info -Q external_fetch
+
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: searchdb
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: pass
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  elasticsearch:
+    image: elasticsearch:8.6.0
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: false
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+volumes:
+  pgdata:
+  esdata:

@@ -1,0 +1,50 @@
+{
+  "mappings": {
+    "properties": {
+      "id": { "type": "keyword" },
+      "name": { 
+        "type": "text", 
+        "analyzer": "russian",
+        "fields": {
+          "keyword": { "type": "keyword" }
+        }
+      },
+      "article": { "type": "keyword" },
+      "barcode": { "type": "keyword" },
+      "category": { 
+        "type": "keyword",
+        "fields": {
+          "text": { "type": "text" }
+        }
+      },
+      "brand": { 
+        "type": "keyword",
+        "fields": {
+          "text": { "type": "text" }
+        }
+      },
+      "description": { 
+        "type": "text", 
+        "analyzer": "russian"
+      },
+      "attributes": { 
+        "type": "object",
+        "dynamic": true
+      },
+      "price": { "type": "float" },
+      "rating": { "type": "float" },
+      "created_at": { "type": "date" }
+    }
+  },
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas": 0,
+    "analysis": {
+      "analyzer": {
+        "russian": {
+          "type": "russian"
+        }
+      }
+    }
+  }
+}
