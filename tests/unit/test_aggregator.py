@@ -1,11 +1,15 @@
 """Unit тесты для модуля агрегации результатов."""
 
 import pytest
-from app.aggregator import aggregator
+from app.aggregator import ResultAggregator
 
 
 class TestAggregator:
     """Тесты для агрегатора результатов."""
+
+    def setup_method(self):
+        """Инициализация перед каждым тестом."""
+        self.aggregator = ResultAggregator(duplicate_threshold=90)
 
     def test_merge_internal_and_external(self):
         """Тест объединения внутренних и внешних результатов."""
@@ -19,7 +23,11 @@ class TestAggregator:
             {"name": "iPhone 15", "price": 92000, "shop": "Ozon", "source": "ozon"}
         ]
         
-        result = aggregator.aggregate(internal_results=internal, external_results=external, limit=10)
+        result = self.aggregator.aggregate(
+            internal_results=internal, 
+            external_results=external, 
+            limit=10
+        )
         
         assert len(result) > 0
         # Проверяем что есть результаты из обоих источников
@@ -33,7 +41,7 @@ class TestAggregator:
             {"name": "Apple iPhone 15", "article": "A12345", "price": 89990, "shop": "Shop2"}
         ]
         
-        result = aggregator.remove_duplicates(items)
+        result = self.aggregator._remove_duplicates(items)
         
         # Должен остаться один товар с одинаковым артикулом
         assert len(result) == 1
@@ -46,7 +54,7 @@ class TestAggregator:
             {"name": "Samsung Galaxy S23 Ultra 256 GB", "price": 94000, "shop": "Shop2"}
         ]
         
-        result = aggregator.remove_duplicates(items)
+        result = self.aggregator._remove_duplicates(items)
         
         # Названия очень похожи - должен остаться один
         assert len(result) == 1
@@ -61,7 +69,7 @@ class TestAggregator:
         ]
         
         filters = {"price_min": 70000, "price_max": 130000}
-        result = aggregator.apply_filters(items, filters)
+        result = self.aggregator._apply_filters(items, filters)
         
         assert len(result) == 2
         prices = [item['price'] for item in result]
@@ -76,7 +84,7 @@ class TestAggregator:
         ]
         
         filters = {"category": "electronics"}
-        result = aggregator.apply_filters(items, filters)
+        result = self.aggregator._apply_filters(items, filters)
         
         assert len(result) == 2
         assert all(item['category'] == 'electronics' for item in result)
@@ -89,7 +97,7 @@ class TestAggregator:
             {"name": "Product 3", "price": 75000}
         ]
         
-        result = aggregator.sort_results(items, sort_by='price_asc')
+        result = self.aggregator._sort(items, sort_by='price', order='asc')
         
         assert result[0]['price'] == 50000
         assert result[1]['price'] == 75000
@@ -103,7 +111,7 @@ class TestAggregator:
             {"name": "Product 3", "price": 75000}
         ]
         
-        result = aggregator.sort_results(items, sort_by='price_desc')
+        result = self.aggregator._sort(items, sort_by='price', order='desc')
         
         assert result[0]['price'] == 100000
         assert result[1]['price'] == 75000
@@ -113,7 +121,11 @@ class TestAggregator:
         """Тест лимитирования результатов."""
         items = [{"name": f"Product {i}", "price": i * 1000} for i in range(20)]
         
-        result = aggregator.limit_results(items, limit=5)
+        result = self.aggregator.aggregate(
+            internal_results=[],
+            external_results=items,
+            limit=5
+        )
         
         assert len(result) == 5
 
@@ -132,12 +144,13 @@ class TestAggregator:
         
         filters = {"price_min": 50000, "price_max": 100000, "category": "electronics"}
         
-        result = aggregator.aggregate(
+        result = self.aggregator.aggregate(
             internal_results=internal,
             external_results=external,
             limit=5,
             filters=filters,
-            sort_by='price_asc'
+            sort_by='price',
+            order='asc'
         )
         
         # Все цены должны быть в диапазоне
@@ -150,7 +163,11 @@ class TestAggregator:
 
     def test_empty_inputs(self):
         """Тест с пустыми входными данными."""
-        result = aggregator.aggregate(internal_results=[], external_results=[], limit=10)
+        result = self.aggregator.aggregate(
+            internal_results=[], 
+            external_results=[], 
+            limit=10
+        )
         assert len(result) == 0
 
     def test_no_duplicates_different_shops(self):
@@ -161,6 +178,33 @@ class TestAggregator:
             {"name": "Pixel 8", "price": 75000, "shop": "Wildberries"}
         ]
         
-        result = aggregator.remove_duplicates(items)
+        result = self.aggregator._remove_duplicates(items)
         
         assert len(result) == 3
+
+    def test_group_by_shop(self):
+        """Тест группировки по магазинам."""
+        items = [
+            {"name": "iPhone 15", "price": 90000, "shop": "М.Видео"},
+            {"name": "iPhone 15", "price": 89990, "shop": "Wildberries"},
+            {"name": "iPhone 15", "price": 92000, "shop": "М.Видео"}
+        ]
+        
+        grouped = self.aggregator.group_by_shop(items)
+        
+        assert len(grouped) == 2
+        assert len(grouped['М.Видео']) == 2
+        assert len(grouped['Wildberries']) == 1
+
+    def test_get_best_prices(self):
+        """Тест получения лучших цен."""
+        items = [
+            {"name": "iPhone 15", "article": "A1", "price": 90000, "shop": "Shop1"},
+            {"name": "iPhone 15", "article": "A1", "price": 85000, "shop": "Shop2"},
+            {"name": "iPhone 15", "article": "A1", "price": 88000, "shop": "Shop3"}
+        ]
+        
+        best = self.aggregator.get_best_prices(items)
+        
+        assert len(best) == 1
+        assert best[0]['price'] == 85000
